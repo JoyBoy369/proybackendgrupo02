@@ -5,6 +5,8 @@ const usuario = require('../models/usuario');
 const router = express.Router();
 
 router.post('/', usuarioCtrl.createUsuario);
+router.post('/register', usuarioCtrl.registerUsuario);
+router.get('/login', usuarioCtrl.loginUsuario);
 router.get('/', usuarioCtrl.getUsuarios);
 router.get('/rol/:rol', usuarioCtrl.getUsuariosByRol);
 router.get('/:id', usuarioCtrl.getUsuario);
