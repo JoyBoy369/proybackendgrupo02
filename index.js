@@ -7,6 +7,7 @@ app.use(express.json());
 app.use(cors({ origin: 'http://localhost:4200' }));
 
 app.use('/api/usuario', require('./routes/usuario.route.js'));
+app.use('/api/pelicula', require('./routes/pelicula.route.js'));
 
 app.set('port', process.env.PORT || 3000);
 
