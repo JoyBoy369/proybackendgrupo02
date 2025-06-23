@@ -14,14 +14,21 @@ peliculaCtrl.getPeliculas = async (req, res) => {
 }
 
 peliculaCtrl.createPelicula = async (req, res) => {
-    const existente = await Pelicula.findOne({ nombre: req.body.nombre });
+    const existente = await Pelicula.findOne({ originalTitle: req.body.originalTitle });
     if (existente) {
         return res.status(409).json({
             status: '0',
             msg: 'La pelicula ya esta registrada.'
         })
     }
-    var pelicula = new Pelicula(req.body);
+    var pelicula = new Pelicula({
+        id: req.body.id,
+        originalTitle: req.body.originalTitle,
+        description: req.body.description,
+        releaseDate: req.body.releaseDate,
+        trailer: req.body.trailer,
+        primaryImage: req.body.primaryImage
+    });
     try {
         await pelicula.save();
         res.json({
