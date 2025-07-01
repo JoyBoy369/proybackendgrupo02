@@ -9,7 +9,7 @@ app.use(cors({ origin: 'http://localhost:4200' }));
 app.use('/api/usuario', require('./routes/usuario.route.js'));
 app.use('/api/pelicula', require('./routes/pelicula.route.js'));
 app.use('/api/funcion', require('./routes/funcion.route.js'));
-
+app.use('/api/reserva', require('./routes/reserva.route.js'));
 app.set('port', process.env.PORT || 3000);
 
 app.listen(app.get('port'), () => {
