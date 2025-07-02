@@ -1,6 +1,8 @@
 const Usuario = require('../models/usuario');
 const usuarioCtrl = {}
 const { verifyGoogleToken } = require('../security/googleAuth');
+const jwt = require('jsonwebtoken');
+
 
 usuarioCtrl.createUsuario = async (req, res) => {
     const existente = await Usuario.findOne({ email: req.body.email });
@@ -92,6 +94,7 @@ usuarioCtrl.loginUsuario = async (req, res) => {
         }
 
         // Login exitoso
+        const unToken = jwt.sign({id: user._id}, "secretkey");
         res.json({
             status: 1,
             msg: "Login exitoso.",
@@ -100,7 +103,8 @@ usuarioCtrl.loginUsuario = async (req, res) => {
             nombre: user.nombre,
             email: user.email,
             estado: user.estado,
-            rol: user.rol
+            rol: user.rol,
+            token: unToken
         });
 
     } catch (error) {

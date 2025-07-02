@@ -1,4 +1,5 @@
 const usuarioCtrl = require('../controllers/usuario.controller');
+const autCtrl = require('./../controllers/auth.controller');
 
 const express = require('express');
 const usuario = require('../models/usuario');
