@@ -1,5 +1,6 @@
 const Usuario = require('../models/usuario');
 const usuarioCtrl = {}
+const { verifyGoogleToken } = require('../security/googleAuth');
 
 usuarioCtrl.createUsuario = async (req, res) => {
     const existente = await Usuario.findOne({ email: req.body.email });
@@ -71,37 +72,44 @@ usuarioCtrl.getUsuario = async (req, res) => {
 }
 
 usuarioCtrl.loginUsuario = async (req, res) => {
-    const criteria = {
-        email: req.body.email,
-        contrasenia: req.body.contrasenia
-    }
     try {
-        const user = await Usuario.findOne(criteria);
+        const { login, password } = req.body;  // login puede ser email o username
+
+        // Buscar usuario por email o username y contraseña
+        const user = await Usuario.findOne({
+            $or: [
+                { email: login },
+                { username: login }
+            ],
+            password: password  // asegúrate que el campo en la DB sea password y no contrasenia
+        });
+
         if (!user) {
-            res.status(401).json({
+            return res.status(401).json({
                 status: 0,
-                msg: "Email o contraseña incorrectos."
-            })
-        } else {
-            res.json({
-                status: 1,
-                msg: "Login exitoso.",
-                userid: user._id,
-                nombre: user.nombre,
-                apellido: user.apellido,
-                username: user.username,
-                email: user.email,
-                activo: user.activo,
-                rol: user.rol
-            })
+                msg: "Email/username o contraseña incorrectos."
+            });
         }
+
+        // Login exitoso
+        res.json({
+            status: 1,
+            msg: "Login exitoso.",
+            userid: user._id,
+            username: user.username,
+            nombre: user.nombre,
+            email: user.email,
+            estado: user.estado,
+            rol: user.rol
+        });
+
     } catch (error) {
         res.status(400).json({
             status: 0,
             msg: 'Error procesando la operacion.'
-        })
+        });
     }
-}
+};
 
 usuarioCtrl.editUsuario = async (req, res) => {
     try {
@@ -132,5 +140,37 @@ usuarioCtrl.deleteUsuario = async (req, res) => {
         })
     }
 }
+
+usuarioCtrl.validarNuevoUsuario = async (req, res) => {
+    try {
+        const usuarioExistente = await Usuario.findOne({ email: req.body.email });
+        if (usuarioExistente) {
+            return res.json({ existe: true });
+        }
+        return res.json({ existe: false });
+    } catch (error) {
+        return res.status(500).json({
+            status: '0',
+            msg: 'Error validando el usuario.'
+        });
+    }
+};
+
+usuarioCtrl.googleLoginUsuario = async (req, res) => {
+  const idToken = req.body.idToken;
+  if (!idToken) {
+    console.log('No ID token received in request body:', req.body);
+    return res.status(400).json({ message: 'No ID token provided' });
+  }
+  try {
+    const payload = await verifyGoogleToken(idToken);
+    console.log('Payload del token verificado:', payload);
+    // Aquí continua la lógica de login o registro con el payload
+    res.json({ status: '1', msg: 'Login Google OK', user: payload });
+  } catch (error) {
+    console.error('Error verificando token Google:', error);
+    return res.status(400).json({ message: 'Token verification failed', error });
+  }
+};
 
 module.exports = usuarioCtrl;

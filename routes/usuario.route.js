@@ -12,5 +12,7 @@ router.get('/rol/:rol', usuarioCtrl.getUsuariosByRol);
 router.get('/:id', usuarioCtrl.getUsuario);
 router.put('/:id', usuarioCtrl.editUsuario);
 router.delete('/:id', usuarioCtrl.deleteUsuario);
+router.post('/validator', usuarioCtrl.validarNuevoUsuario);
+router.post('/google-login', usuarioCtrl.googleLoginUsuario);
 
 module.exports = router;
