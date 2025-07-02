@@ -6,40 +6,42 @@ peliculaCtrl.getPeliculas = async (req, res) => {
         const peliculas = await Pelicula.find();
         res.json(peliculas);
     } catch (error) {
-        res.status(400).json({
+        res.status(500).json({
             status: '0',
             msg: 'Error obteniendo las peliculas.'
         });
     }
 }
 
+peliculaCtrl.getPelicula = async (req, res) => {
+    const pelicula = await Pelicula.findById(req.params.id);
+    res.json(pelicula);
+}
+
 peliculaCtrl.createPelicula = async (req, res) => {
-    const existente = await Pelicula.findOne({ originalTitle: req.body.originalTitle });
-    if (existente) {
-        return res.status(409).json({
-            status: '0',
-            msg: 'La pelicula ya esta registrada.'
-        })
-    }
-    var pelicula = new Pelicula({
-        id: req.body.id,
-        originalTitle: req.body.originalTitle,
-        description: req.body.description,
-        releaseDate: req.body.releaseDate,
-        trailer: req.body.trailer,
-        primaryImage: req.body.primaryImage
-    });
+     var pelicula = new Pelicula(req.body);
     try {
+        
+        const existingMovie = await Pelicula.findOne({ _id: pelicula._id });
+
+        if (existingMovie) {
+            return res.status(409).json({
+                'status': '0',
+                'msg': 'Error: La película ya existe en la base de datos'
+            });
+        }
+
         await pelicula.save();
-        res.json({
+        res.status(201).json({
             'status': '1',
-            'msg': 'Pelicula guardada.'
-        })
+            'msg': 'Película guardada con éxito'
+        });
     } catch (error) {
+        console.error("Error al crear película:", error); 
         res.status(400).json({
             'status': '0',
-            'msg': 'Error Guardando la pelicula.'
-        })
+            'msg': 'Error procesando la operación. Verifique los datos enviados.'
+        });
     }
 }
 

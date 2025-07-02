@@ -1,20 +1,24 @@
 {
-  "name": "proybackendgrupo02",
+  "name": "backtest",
   "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon index.js"
   },
-  "author": "",
-  "license": "ISC",
   "dependencies": {
+    "axios": "^1.10.0",
     "cors": "^2.8.5",
+    "dotenv": "^17.0.0",
     "express": "^5.1.0",
-    "mongoose": "^8.16.0"
+    "mongoose": "^8.16.0",
+    "node-cron": "^4.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
-  },
-  "description": ""
+  }
 }
