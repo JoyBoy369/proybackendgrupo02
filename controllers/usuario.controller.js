@@ -34,7 +34,7 @@ usuarioCtrl.registerUsuario = async (req, res) => {
     }
     const usuario = new Usuario({
         ...req.body,
-        rol: 'Usuario'
+        rol: 'Cliente'
     })
     try {
         await usuario.save();
@@ -57,6 +57,11 @@ usuarioCtrl.getUsuarios = async (req, res) => {
 
 usuarioCtrl.getUsuariosByRol = async (req, res) => {
     var usuarios = await Usuario.find({ rol: req.params.rol });
+    res.json(usuarios);
+}
+
+usuarioCtrl.getUsuariosByEmail = async (req, res) => {
+    var usuarios = await Usuario.find({ email: req.params.email });
     res.json(usuarios);
 }
 
@@ -83,7 +88,10 @@ usuarioCtrl.loginUsuario = async (req, res) => {
                 msg: "Login exitoso.",
                 userid: user._id,
                 nombre: user.nombre,
+                apellido: user.apellido,
+                username: user.username,
                 email: user.email,
+                activo: user.activo,
                 rol: user.rol
             })
         }
