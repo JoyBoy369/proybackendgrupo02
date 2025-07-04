@@ -152,4 +152,390 @@ reservaCtrl.deleteReserva = async (req, res) => {
     }
 };
 
+
+reservaCtrl.getResumenSemanal = async (req, res) => {
+    try {
+        const hoy = new Date();
+        // Establece la hora al final del día de hoy para incluir todas las reservas de hoy
+        hoy.setHours(23, 59, 59, 999); 
+    
+        // Calcula la fecha de hace 7 días, comenzando al inicio de ese día
+        const hace7Dias = new Date(hoy);
+        hace7Dias.setDate(hoy.getDate() - 6); // Restamos 6 para incluir el día actual y los 6 anteriores
+        hace7Dias.setHours(0, 0, 0, 0); // Establece la hora al inicio del día
+    
+        const ventasPorDia = await Reserva.aggregate([
+          {
+            $match: {
+              // Aseguramos que la fecha de la reserva esté en el rango inclusivo
+              fecha: { $gte: hace7Dias, $lte: hoy } 
+            }
+          },
+          {
+            $group: {
+              _id: {
+                $dateToString: { format: "%Y-%m-%d", date: "$fecha" } // Agrupa por fecha (formato YYYY-MM-DD)
+              },
+              totalBoletosVendidos: { $sum: "$cantidadReservas" } // Suma la cantidad de reservas por día
+            }
+          },
+          {
+            $sort: { _id: 1 } // Ordena por fecha ascendente
+          }
+        ]);
+    
+        // Preparar los datos para Chart.js
+        const labels = [];
+        const data = [];
+        const backgroundColors = ['rgba(54, 162, 235, 0.6)', 'rgba(255, 99, 132, 0.6)', 'rgba(75, 192, 192, 0.6)', 'rgba(153, 102, 255, 0.6)', 'rgba(255, 159, 64, 0.6)', 'rgba(255, 99, 132, 0.6)', 'rgba(75, 192, 192, 0.6)'];
+        
+        // Mapear las ventas obtenidas para facilitar la búsqueda
+        const ventasMap = new Map(ventasPorDia.map(item => [item._id, item.totalBoletosVendidos]));
+    
+        // Llenar los datos para los últimos 7 días
+        for (let i = 0; i < 7; i++) {
+          const fechaIteracion = new Date(hace7Dias);
+          fechaIteracion.setDate(hace7Dias.getDate() + i);
+          const fechaFormateada = fechaIteracion.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+    
+          const boletosVendidos = ventasMap.get(fechaFormateada) || 0; // Obtiene el total o 0 si no hay ventas
+          
+          labels.push(fechaFormateada);
+          data.push(boletosVendidos); 
+        }
+    
+        res.status(200).json({
+          labels: labels,
+          data: data,
+          backgroundColor: backgroundColors
+        });
+    
+      } catch (error) {
+        console.error("Error al obtener las ventas de los últimos 7 días:", error);
+        res.status(500).json({ message: "Error interno del servidor." });
+      }
+    
+};
+
+reservaCtrl.getIngresosSemanales = async (req, res) => {
+    try {
+        const hoy = new Date();
+        // Establece la hora al final del día de hoy para incluir todas las reservas de hoy
+        hoy.setHours(23, 59, 59, 999);
+
+        // Calcula la fecha de hace 7 días, comenzando al inicio de ese día
+        const hace7Dias = new Date(hoy);
+        hace7Dias.setDate(hoy.getDate() - 6); // Restamos 6 para incluir el día actual y los 6 anteriores
+        hace7Dias.setHours(0, 0, 0, 0); // Establece la hora al inicio del día
+
+        const ingresosPorDia = await Reserva.aggregate([
+            {
+                $match: {
+                    // Aseguramos que la fecha de la reserva esté en el rango inclusivo
+                    fecha: { $gte: hace7Dias, $lte: hoy }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        $dateToString: { format: "%Y-%m-%d", date: "$fecha" } // Agrupa por fecha (formato YYYY-MM-DD)
+                    },
+                    totalIngresosDiarios: { $sum: "$precioFinal" } // Suma el precioFinal por día
+                }
+            },
+            {
+                $sort: { _id: 1 } // Ordena por fecha ascendente
+            }
+        ]);
+
+        // Preparar los datos para Chart.js
+        const labels = [];
+        const data = [];
+        // Puedes definir un array de colores fijos como hiciste, o generarlos dinámicamente
+        const backgroundColors = ['rgba(54, 162, 235, 0.6)', 'rgba(255, 99, 132, 0.6)', 'rgba(75, 192, 192, 0.6)', 'rgba(153, 102, 255, 0.6)', 'rgba(255, 159, 64, 0.6)', 'rgba(255, 99, 132, 0.6)', 'rgba(75, 192, 192, 0.6)'];
+
+        // Mapear los ingresos obtenidos para facilitar la búsqueda
+        const ingresosMap = new Map(ingresosPorDia.map(item => [item._id, item.totalIngresosDiarios]));
+
+        // Llenar los datos para los últimos 7 días
+        for (let i = 0; i < 7; i++) {
+            const fechaIteracion = new Date(hace7Dias);
+            fechaIteracion.setDate(hace7Dias.getDate() + i);
+            const fechaFormateada = fechaIteracion.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+
+            const ingresosDelDia = ingresosMap.get(fechaFormateada) || 0; // Obtiene el total o 0 si no hay ingresos
+
+            labels.push(fechaFormateada);
+            data.push(ingresosDelDia);
+            // Si quieres colores dinámicos aquí, usarías: backgroundColors.push(generarColorAleatorio());
+        }
+
+        res.status(200).json({
+            labels: labels,
+            data: data,
+            backgroundColor: backgroundColors
+        });
+
+    } catch (error) {
+        console.error("Error al obtener los ingresos de los últimos 7 días:", error);
+        res.status(500).json({ message: "Error interno del servidor." });
+    }
+};
+
+reservaCtrl.getIngresosAnuales = async (req, res) => {
+    try {
+        // Get current date and first day of the year
+        const fechaActual = new Date();
+        const primerDiaAno = new Date(fechaActual.getFullYear(), 0, 1);
+
+        // Get income by month for the current year
+        const ingresos = await Reserva.aggregate([
+            {
+                $match: {
+                    fecha: {
+                        $gte: primerDiaAno,
+                        $lte: fechaActual
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        mes: { $month: "$fecha" },
+                        anio: { $year: "$fecha" }
+                    },
+                    totalIngreso: {
+                        $sum: "$precioFinal"
+                    }
+                }
+            },
+            {
+                $sort: {
+                    '_id.mes': 1
+                }
+            }
+        ]);
+
+        console.log('Ingresos anuales:', ingresos);
+
+        // Generate labels for all months of the year
+        const labels = [];
+        const data = [];
+        const meses = [
+            'Enero', 'Febrero', 'Marzo', 'Abril', 
+            'Mayo', 'Junio', 'Julio', 'Agosto',
+            'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+        ];
+        
+        for (let mes = 1; mes <= 12; mes++) {
+            labels.push(meses[mes - 1]);
+            const ingresoMes = ingresos.find(d => d._id.mes === mes);
+            data.push(ingresoMes ? ingresoMes.totalIngreso : 0);
+        }
+
+        // Format response with colors for the chart
+        const backgroundColors = [
+            'rgba(255, 99, 132, 0.6)'
+        ];
+        
+
+        res.status(200).json({
+            labels: labels,
+            data: data,
+            backgroundColor: backgroundColors
+        });
+
+    } catch (error) {
+        console.error("Error al obtener ingresos mensuales:", error);
+        res.status(500).json({ message: "Error interno del servidor al obtener ingresos mensuales." });
+    }
+};
+
+reservaCtrl.getTotalVentasUltimoMes = async (req, res) => {
+    try {
+        // Get current date and date from one month ago
+        const fechaActual = new Date();
+        const fechaUnMesAtras = new Date();
+        fechaUnMesAtras.setMonth(fechaActual.getMonth() - 1);
+
+        // Get total sales and tickets for the last month
+        const resultado = await Reserva.aggregate([
+            {
+                $match: {
+                    fecha: {
+                        $gte: fechaUnMesAtras,
+                        $lte: fechaActual
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalVentas: {
+                        $sum: "$precioFinal"
+                    },
+                    totalBoletos: {
+                        $sum: "$cantidadReservas"
+                    }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    totalVentas: {
+                        $round: ["$totalVentas", 2]
+                    },
+                    totalBoletos: 1
+                }
+            }
+        ]);
+
+        console.log('Resultado:', resultado);
+
+        // Format response
+        const data = resultado.length > 0 ? resultado[0] : {
+            totalVentas: 0,
+            totalBoletos: 0
+        };
+
+        res.status(200).json({
+            totalVentas: data.totalVentas,
+            totalBoletos: data.totalBoletos
+        });
+
+    } catch (error) {
+        console.error("Error al obtener las ventas del último mes:", error);
+        res.status(500).json({ message: "Error interno del servidor al obtener las ventas del último mes." });
+    }
+};
+
+reservaCtrl.getVentasPorPelicula = async (req, res) => {
+    try {
+        // Get movie sales
+        const reservas = await Reserva.find({}, { funcion: 1, cantidadReservas: 1 })
+            .populate('funcion', 'pelicula')
+            .populate('funcion.pelicula', '_id originalTitle')
+            .lean();
+        console.log('Reservas encontradas:', reservas);
+
+        // Group reservations by movie and get details
+        const ventasPorPelicula = reservas.reduce((acc, reserva) => {
+            const peliculaId = reserva.funcion.pelicula._id.toString();
+            const cantidad = reserva.cantidadReservas;
+            const pelicula = reserva.funcion.pelicula;
+            
+            if (!acc[peliculaId]) {
+                acc[peliculaId] = { 
+                    peliculaId: peliculaId,
+                    pelicula: pelicula.originalTitle,
+                    totalVentas: 0
+                };
+            }
+            acc[peliculaId].totalVentas += cantidad;
+            
+            return acc;
+        }, {});
+
+        // Convert to array and sort by total sales descending
+        const result = Object.values(ventasPorPelicula)
+            .sort((a, b) => b.totalVentas - a.totalVentas);
+
+        console.log('Resultado final:', result);
+
+        // Format response similar to getResumenSemanal and getIngresosSemanales
+        const labels = result.map(item => item.peliculaId);
+        const data = result.map(item => item.totalVentas);
+        const backgroundColors = [
+            'rgba(54, 162, 235, 0.6)',
+            'rgba(75, 192, 192, 0.6)',
+            'rgba(153, 102, 255, 0.6)',
+            'rgba(255, 159, 64, 0.6)',
+            'rgba(255, 99, 132, 0.6)'
+        ];
+        const repeatedBackgroundColors = Array(data.length).fill(backgroundColors).flat().slice(0, data.length);
+
+        res.status(200).json({
+            labels: labels,
+            data: data,
+            backgroundColor: repeatedBackgroundColors
+        });
+
+    } catch (error) {
+        console.error("Error al obtener las ventas por película:", error);
+        res.status(500).json({ message: "Error interno del servidor al obtener las ventas por película." });
+    }
+};
+
+reservaCtrl.getAsistenciaPorFuncion = async (req, res) => {
+    try {
+        // Get attendance data by function
+        // Obtener todas las reservas con sus detalles
+        const reservas = await Reserva.find({}, { funcion: 1, cantidadReservas: 1 })
+            .populate('funcion', 'pelicula sala hora fecha')
+            .populate('funcion.pelicula', 'originalTitle')
+            .lean();
+        console.log('Reservas encontradas:', reservas);
+
+        // Agrupar reservas por función y obtener detalles
+        const asistenciaPorFuncion = reservas.reduce((acc, reserva) => {
+            const funcionId = reserva.funcion._id.toString();
+            const cantidad = reserva.cantidadReservas;
+            const funcion = reserva.funcion;
+            
+            if (!acc[funcionId]) {
+                acc[funcionId] = { 
+                    funcion: funcionId, 
+                    totalAsistencia: 0,
+                    detalles: {
+                        pelicula: funcion.pelicula.originalTitle,
+                        sala: funcion.sala,
+                        hora: funcion.hora,
+                        fecha: funcion.fecha
+                    }
+                };
+            }
+            acc[funcionId].totalAsistencia += cantidad;
+            
+            return acc;
+        }, {});
+
+        // Convertir a array y ordenar
+        const result = Object.values(asistenciaPorFuncion)
+            .sort((a, b) => new Date(b.detalles.fecha) - new Date(a.detalles.fecha));
+
+        console.log('Resultado final:', result);
+
+        // Format response similar to getResumenSemanal and getIngresosSemanales
+        const labels = result.map(item => {
+            const { detalles } = item;
+            const fechaFormateada = new Date(detalles.fecha).toLocaleDateString('es-ES', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+            return `${detalles.pelicula} - Sala ${detalles.sala} - ${detalles.hora} - ${fechaFormateada}`;
+        });
+        const data = result.map(item => item.totalAsistencia);
+        const backgroundColors = [
+            'rgba(54, 162, 235, 0.6)',
+            'rgba(75, 192, 192, 0.6)',
+            'rgba(153, 102, 255, 0.6)',
+            'rgba(255, 159, 64, 0.6)',
+            'rgba(255, 99, 132, 0.6)'
+        ];
+        const repeatedBackgroundColors = Array(data.length).fill(backgroundColors).flat().slice(0, data.length);
+
+        res.status(200).json({
+            labels: labels,
+            data: data,
+            backgroundColor: repeatedBackgroundColors
+        });
+
+    } catch (error) {
+        console.error("Error al obtener la asistencia por función:", error);
+        res.status(500).json({ message: "Error interno del servidor al obtener la asistencia por función." });
+    }
+};
+
+
 module.exports = reservaCtrl;
