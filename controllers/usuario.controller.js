@@ -5,11 +5,18 @@ const jwt = require('jsonwebtoken');
 
 
 usuarioCtrl.createUsuario = async (req, res) => {
-    const existente = await Usuario.findOne({ email: req.body.email });
-    if (existente) {
+    const existeEmail = await Usuario.findOne({ email: req.body.email });
+    const existeUsername = await Usuario.findOne({ username: req.body.username });
+    if (existeEmail) {
         return res.status(409).json({
             status: '0',
             msg: 'Ya existe un usuario con ese email.'
+        })
+    }
+    if (existeUsername) {
+        return res.status(409).json({
+            status: '0',
+            msg: 'Ya existe un usuario con ese username.'
         })
     }
     var usuario = new Usuario(req.body);
@@ -28,11 +35,18 @@ usuarioCtrl.createUsuario = async (req, res) => {
 }
 
 usuarioCtrl.registerUsuario = async (req, res) => {
-    const existente = await Usuario.findOne({ email: req.body.email });
-    if (existente) {
+    const existeEmail = await Usuario.findOne({ email: req.body.email });
+    const existeUsername = await Usuario.findOne({ username: req.body.username });
+    if (existeEmail) {
         return res.status(409).json({
             status: '0',
             msg: 'Ya existe un usuario con ese email.'
+        })
+    }
+    if (existeUsername) {
+        return res.status(409).json({
+            status: '0',
+            msg: 'Ya existe un usuario con ese username.'
         })
     }
     const usuario = new Usuario({
@@ -63,13 +77,15 @@ usuarioCtrl.getUsuariosByRol = async (req, res) => {
     res.json(usuarios);
 }
 
-usuarioCtrl.getUsuariosByEmail = async (req, res) => {
-    var usuarios = await Usuario.find({ email: req.params.email });
-    res.json(usuarios);
-}
+usuarioCtrl.getUsuarioByEmail = async (req, res) => {
+    const usuario = await Usuario.findOne({ email: req.params.email });
+    if (!usuario) return res.status(404).json({ status: 0, msg: 'No encontrado' });
+    res.json(usuario);
+};
 
 usuarioCtrl.getUsuario = async (req, res) => {
     const usuario = await Usuario.findById(req.params.id);
+    if (!usuario) return res.status(404).json({ status: 0, msg: 'No encontrado' });
     res.json(usuario);
 }
 
@@ -94,7 +110,7 @@ usuarioCtrl.loginUsuario = async (req, res) => {
         }
 
         // Login exitoso
-        const unToken = jwt.sign({id: user._id}, "secretkey");
+        const unToken = jwt.sign({id: user._id}, "secretkey", {expiresIn: '2h'});
         res.json({
             status: 1,
             msg: "Login exitoso.",
