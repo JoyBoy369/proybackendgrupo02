@@ -19,6 +19,7 @@ usuarioCtrl.createUsuario = async (req, res) => {
             msg: 'Ya existe un usuario con ese username.'
         })
     }
+    const usuario = new Usuario(req.body);
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(usuario.password, salt);
     usuario.password = hashedPassword;
