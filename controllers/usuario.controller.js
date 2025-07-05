@@ -2,7 +2,7 @@ const Usuario = require('../models/usuario');
 const usuarioCtrl = {}
 const { verifyGoogleToken } = require('../security/googleAuth');
 const jwt = require('jsonwebtoken');
-
+const bcrypt = require('bcrypt');
 
 usuarioCtrl.createUsuario = async (req, res) => {
     const existeEmail = await Usuario.findOne({ email: req.body.email });
@@ -19,7 +19,9 @@ usuarioCtrl.createUsuario = async (req, res) => {
             msg: 'Ya existe un usuario con ese username.'
         })
     }
-    var usuario = new Usuario(req.body);
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(usuario.password, salt);
+    usuario.password = hashedPassword;
     try {
         await usuario.save();
         res.json({
@@ -53,6 +55,9 @@ usuarioCtrl.registerUsuario = async (req, res) => {
         ...req.body,
         rol: 'Cliente'
     })
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(usuario.password, salt);
+    usuario.password = hashedPassword;
     try {
         await usuario.save();
         res.json({
@@ -98,17 +103,21 @@ usuarioCtrl.loginUsuario = async (req, res) => {
             $or: [
                 { email: login },
                 { username: login }
-            ],
-            password: password  // asegúrate que el campo en la DB sea password y no contrasenia
+            ]
         });
-
         if (!user) {
             return res.status(401).json({
                 status: 0,
-                msg: "Email/username o contraseña incorrectos."
+                msg: "Email/username incorrectos."
             });
         }
-
+        const validPass = await bcrypt.compare(password, user.password);
+        if(!validPass){
+            return res.status(401).json({
+                status: 0,
+                msg: "Password incorrecto."
+            });
+        }
         // Login exitoso
         const unToken = jwt.sign({id: user._id}, "secretkey", {expiresIn: '2h'});
         res.json({
