@@ -537,5 +537,42 @@ reservaCtrl.getAsistenciaPorFuncion = async (req, res) => {
     }
 };
 
+reservaCtrl.getReservasByUser = async (req, res) => {
+    try {
+        // 1. Obtener el ID de usuario de los parámetros de la solicitud
+        const { id } = req.params;
+
+        // 2. Validar que el ID de usuario exista
+        if (!id) {
+            return res.status(400).json({
+                message: 'Se requiere el ID de usuario en los parámetros de la URL.'
+            });
+        }
+
+        // 3. Buscar las reservas en la base de datos
+        const reservas = await Reserva.find({ usuario: id })
+            .populate('funcion')
+            .sort({ fecha: -1 }); // Ordenar las reservas por fecha, las más recientes primero
+
+        // 4. Verificar si se encontraron reservas
+        if (reservas.length === 0) {
+            return res.status(404).json({
+                message: 'No se encontraron reservas para el usuario con ID: ${id}'
+            });
+        }
+
+        // 5. Enviar las reservas encontradas como respuesta
+        res.status(200).json(reservas);
+
+    } catch (error) {
+        // Manejo de errores en caso de problemas con la base de datos o cualquier otra excepción
+        console.error('Error al obtener reservas por usuario:', error);
+        res.status(500).json({
+            message: 'Error interno del servidor al obtener las reservas.',
+            error: error.message
+        });
+    }
+};
+
 
 module.exports = reservaCtrl;
