@@ -9,6 +9,11 @@ const ReservaSchema = new Schema({
     fecha: { type: Date, required: true },
     precioFinal: { type: Number, required: true },
     butacasReservadas: { type: [String], default: [] },
-    qr: { type: String, required: false}
+    imagen: { type: String, required: false },
+    qr: { type: String, required: false},
+    pagado: { type: String, required: true }
 })
+
+    //Agregué dos atributos: Pagado para saber si se pagó la reserva y el estado de la reserva. Y imagen para guardar la imagen del ticket
+    //Podemos borrar el qr porque no lo usamos.
 module.exports = mongoose.models.Reserva || mongoose.model('Reserva', ReservaSchema); 

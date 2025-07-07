@@ -1,7 +1,16 @@
 const Reserva = require('../models/reserva');
 const Funcion = require('../models/funcion');
+const Pelicula = require('../models/pelicula');
+// Importa la librería 'axios' para realizar solicitudes HTTP a APIs externas (como Mercado Pago y Placid.app).
+const axios = require('axios');
 const reservaCtrl = {};
 
+
+
+//Función auxiliar que crea una promesa que se resuelve después de un tiempo determinado.
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 // Colores estáticos para los reportes
 const COLORS = {
     PELICULAS: '#4CAF50',
@@ -10,9 +19,16 @@ const COLORS = {
     RESERVAS: '#9C27B0'
 };
 
+//Obtiene todas las reservas de la base de datos(no implemtenté ninguna en el front)
 reservaCtrl.getReservas = async (req, res) => {
     try {
-        const reservas = await Reserva.find().populate('funcion');
+        const reservas = await Reserva.find().populate({
+            path: 'funcion',
+            populate: {
+                path: 'pelicula',
+                model: 'Pelicula'
+            }
+        });;
         res.json(reservas);
     } catch (error) {
         console.error("Error al obtener las reservas:", error);
@@ -23,13 +39,20 @@ reservaCtrl.getReservas = async (req, res) => {
     }
 };
 
+//Obtiene una reserva específica por su ID, incluyendo detalles de la función y la película.
 reservaCtrl.getReserva = async (req, res) => {
     const { id } = req.params;
     try {
         let reserva;
-        reserva = await Reserva.findById(id).populate('funcion');
+        reserva = await Reserva.findById(id)
+            .populate({
+                path: 'funcion',
+                populate: {
+                    path: 'pelicula',
+                    model: 'Pelicula'
+                }
+            });
 
-        // reserva = await Reserva.findOne({ usuario: id }).populate('funcion'); 
         if (!reserva) {
             return res.status(404).json({
                 'status': '0',
@@ -46,11 +69,13 @@ reservaCtrl.getReserva = async (req, res) => {
     }
 };
 
+// Crea una nueva reserva de cine y actualiza las butacas ocupadas en la función asociada
 reservaCtrl.createReserva = async (req, res) => {
     const { usuario, funcion, cantidadReservas, fecha, precioFinal, butacasReservadas, qr } = req.body;
 
     try {
-        const funcionExistente = await Funcion.findById(funcion);
+        const funcionExistente = await Funcion.findById(funcion).populate('pelicula');
+
         if (!funcionExistente) {
             return res.status(404).json({
                 'status': '0',
@@ -65,7 +90,9 @@ reservaCtrl.createReserva = async (req, res) => {
             });
         }
 
+        // Obtiene las butacas ya ocupadas de la función existente.
         const butacasOcupadas = funcionExistente.butacasOcupadas || [];
+        // Comprueba si alguna de las butacas que se intentan reservar ya está ocupada.
         const butacasSolapadas = butacasReservadas.filter(butaca => butacasOcupadas.includes(butaca));
         if (butacasSolapadas.length > 0) {
             return res.status(400).json({
@@ -73,18 +100,33 @@ reservaCtrl.createReserva = async (req, res) => {
                 'msg': `Las butacas ${butacasSolapadas.join(', ')} ya están reservadas.`,
             });
         }
+
         const nuevaReserva = new Reserva(req.body);
+        // Guarda la nueva reserva en la base de datos.
         await nuevaReserva.save();
 
+        // Después de guardar la reserva, la vuelve a buscar y popular para devolver un objeto completo al cliente.
+        const populatedReserva = await Reserva.findById(nuevaReserva._id)
+            .populate({
+                path: 'funcion',
+                populate: {
+                    path: 'pelicula',
+                    model: 'Pelicula'
+                }
+            });
+
+        // Actualiza el array de 'butacasOcupadas' en la función asociada.
+        // Asegura que el array exista antes de intentar hacer push.
         if (funcionExistente.butacasOcupadas) {
             funcionExistente.butacasOcupadas.push(...butacasReservadas);
+            // Guarda los cambios en la función.
             await funcionExistente.save();
         }
 
         res.status(201).json({
             'status': '1',
             'msg': 'Reserva creada exitosamente.',
-            'reserva': nuevaReserva
+            'reserva': populatedReserva
         });
     } catch (error) {
         console.error("Error al crear la reserva:", error);
@@ -95,11 +137,15 @@ reservaCtrl.createReserva = async (req, res) => {
     }
 };
 
+// Actualiza una reserva existente por su ID
 reservaCtrl.editReserva = async (req, res) => {
     const { id } = req.params;
     const { _id, ...updateData } = req.body;
 
     try {
+        // Busca la reserva por ID y la actualiza.
+        // { new: true } devuelve el documento modificado.
+        // { runValidators: true } ejecuta las validaciones del esquema.
         const reservaActualizada = await Reserva.findByIdAndUpdate(
             id,
             { $set: updateData },
@@ -127,6 +173,7 @@ reservaCtrl.editReserva = async (req, res) => {
     }
 };
 
+// Elimina una reserva y libera las butacas asociadas en la función
 reservaCtrl.deleteReserva = async (req, res) => {
     try {
         const reservaEliminada = await Reserva.findByIdAndDelete(req.params.id);
@@ -143,6 +190,7 @@ reservaCtrl.deleteReserva = async (req, res) => {
             funcionAsociada.butacasOcupadas = funcionAsociada.butacasOcupadas.filter(
                 butaca => !reservaEliminada.butacasReservadas.includes(butaca)
             );
+            // Guarda los cambios en la función para reflejar las butacas liberadas.
             await funcionAsociada.save();
         }
 
@@ -419,39 +467,48 @@ reservaCtrl.getTotalVentasUltimoMes = async (req, res) => {
 
 reservaCtrl.getVentasPorPelicula = async (req, res) => {
     try {
-        // Get movie sales
+        // Obtener todas las reservas con sus funciones
         const reservas = await Reserva.find({}, { funcion: 1, cantidadReservas: 1 })
-            .populate('funcion', 'pelicula')
-            .populate('funcion.pelicula', '_id originalTitle')
             .lean();
-        console.log('Reservas encontradas:', reservas);
 
-        // Group reservations by movie and get details
+        // Obtener todos los IDs únicos de funciones
+        const funcionIds = [...new Set(reservas.map(r => r.funcion).filter(id => id))];
+
+        // Obtener las funciones y sus películas en una sola consulta
+        const funciones = await Funcion.find({ _id: { $in: funcionIds } })
+            .populate('pelicula', 'originalTitle')
+            .select('pelicula');
+
+        // Crear un Map de películas para fácil acceso
+        const peliculasMap = new Map(funciones.map(f => [f._id.toString(), {
+            nombre: f.pelicula ? f.pelicula.originalTitle : 'Desconocido'
+        }]));
+
+        // Agrupar reservas por película y obtener detalles
         const ventasPorPelicula = reservas.reduce((acc, reserva) => {
-            const peliculaId = reserva.funcion.pelicula._id.toString();
-            const cantidad = reserva.cantidadReservas;
-            const pelicula = reserva.funcion.pelicula;
-
-            if (!acc[peliculaId]) {
-                acc[peliculaId] = {
-                    peliculaId: peliculaId,
-                    pelicula: pelicula.originalTitle,
-                    totalVentas: 0
-                };
+            const funcionId = reserva.funcion;
+            if (funcionId) {
+                const peliculaInfo = peliculasMap.get(funcionId.toString());
+                const peliculaId = funcionId;
+                
+                if (!acc[peliculaId]) {
+                    acc[peliculaId] = { 
+                        peliculaId: peliculaId,
+                        pelicula: peliculaInfo.nombre,
+                        totalVentas: 0
+                    };
+                }
+                acc[peliculaId].totalVentas += reserva.cantidadReservas;
             }
-            acc[peliculaId].totalVentas += cantidad;
-
             return acc;
         }, {});
 
-        // Convert to array and sort by total sales descending
+        // Convertir a array y ordenar por ventas totales
         const result = Object.values(ventasPorPelicula)
             .sort((a, b) => b.totalVentas - a.totalVentas);
 
-        console.log('Resultado final:', result);
-
-        // Format response similar to getResumenSemanal and getIngresosSemanales
-        const labels = result.map(item => item.peliculaId);
+        // Formatear respuesta
+        const labels = result.map(item => item.pelicula);
         const data = result.map(item => item.totalVentas);
         const backgroundColors = [
             'rgba(54, 162, 235, 0.6)',
@@ -696,7 +753,7 @@ reservaCtrl.getReportePelículas = async (req, res) => {
         // Generate colors based on number of movies
         const colorCount = sortedMovies.length;
         for (let i = 0; i < colorCount; i++) {
-            backgroundColor.push('#${Math.floor(Math.random()*16777215).toString(16)}');
+            backgroundColor.push(`#${Math.floor(Math.random()*16777215).toString(16)}`);
         }
 
         return res.status(200).json({
@@ -816,6 +873,162 @@ reservaCtrl.getReporteReservas = async (req, res) => {
             'error': error.message
         });
     }
-}
+};
+
+//Metodo para generar tickets con Placid: Genera una imagen de ticket visual utilizando la API de Placid.app y guarda la URL de la imagen generada en la reserva.
+reservaCtrl.generatePlacidTicket = async (req, res) => {
+    try {
+        const { reservaId } = req.body; // Obtiene el ID de la reserva del cuerpo de la solicitud.
+
+        if (!reservaId) {
+            return res.status(400).json({
+                'status': '0',
+                'msg': 'El ID de la reserva es requerido para generar el ticket.'
+            });
+        }
+
+        // Busca la reserva completa, incluyendo la función y la película, para obtener todos los datos del ticket.
+        const reservaCompleta = await Reserva.findById(reservaId)
+            .populate({
+                path: 'funcion',
+                populate: {
+                    path: 'pelicula',
+                    model: 'Pelicula'
+                }
+            });
+
+        // Validaciones para asegurar que la reserva y sus relaciones existan.
+        if (!reservaCompleta) {
+            return res.status(404).json({
+                'status': '0',
+                'msg': 'Reserva no encontrada en la base de datos.'
+            });
+        }
+        if (!reservaCompleta.funcion) {
+            return res.status(404).json({
+                'status': '0',
+                'msg': 'Función asociada a la reserva no encontrada.'
+            });
+        }
+        if (!reservaCompleta.funcion.pelicula) {
+            return res.status(404).json({
+                'status': '0',
+                'msg': 'Película asociada a la función de la reserva no encontrada.'
+            });
+        }
+
+        // Obtiene la API Key de Placid.app desde las variables de entorno.
+        const placidApiKey = process.env.PLACID_API_KEY;
+
+        // Prepara los datos para los "layers" (capas) de la plantilla de Placid.app.
+        const seatText = reservaCompleta.butacasReservadas.join(', '); // Butacas separadas por coma.
+        const functionDate = new Date(reservaCompleta.funcion.fecha);
+        // Formatea la fecha a AAAA/MM/DD.
+        const formattedDate = `${functionDate.getFullYear()}/${(functionDate.getMonth() + 1).toString().padStart(2, '0')}/${functionDate.getDate().toString().padStart(2, '0')}`;
+
+        const locationText = reservaCompleta.funcion.sala + ' - ' + reservaCompleta.funcion.hora; // Sala y hora.
+        const titleText = reservaCompleta.funcion.pelicula.originalTitle; // Título de la película.
+        const placidBody = {
+            "template_uuid": "8bizxeobyuu8b", // ID de la plantilla de Placid.app.
+            "layers": {
+                "seat": { "text": seatText },       // Texto para las butacas.
+                "date": { "text": formattedDate },  // Texto para la fecha.
+                "location": { "text": locationText }, // Texto para la ubicación (sala y hora).
+                "title": { "text": titleText }      // Texto para el título de la película.
+            }
+        };
+
+        console.log("Enviando solicitud inicial a Placid.app...");
+        // Realiza la solicitud POST inicial a Placid.app para iniciar la generación de la imagen.
+        const initialPlacidResponse = await axios.post(
+            'https://api.placid.app/api/rest/images',
+            placidBody,
+            {
+                headers: {
+                    'Authorization': `Bearer ${placidApiKey}`, // Autenticación con la API Key de Placid.app.
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        // Extrae el estado inicial, la URL de la imagen (puede estar vacía si aún no está lista)
+        // y la URL de polling para verificar el estado de la generación.
+        let currentStatus = initialPlacidResponse.data.status;
+        let imageUrl = initialPlacidResponse.data.image_url;
+        let pollingUrl = initialPlacidResponse.data.polling_url;
+        const maxAttempts = 10; // Número máximo de intentos para hacer polling.
+        const delayBetweenAttempts = 2000; // Retraso en milisegundos entre cada intento de polling.
+
+        console.log(`Estado inicial de Placid: ${currentStatus}. Polling URL: ${pollingUrl}`);
+
+        // **Mecanismo de Polling:**
+        // Bucle para verificar el estado de la generación de la imagen hasta que esté 'finished' o se excedan los intentos.
+        for (let i = 0; i < maxAttempts && currentStatus !== 'finished'; i++) {
+            await delay(delayBetweenAttempts); // Espera antes del siguiente intento.
+            console.log(`Intento de polling ${i + 1}/${maxAttempts} para ${pollingUrl}`);
+
+            // Realiza una solicitud GET a la URL de polling para obtener el estado actual de la imagen.
+            const pollingResponse = await axios.get(
+                pollingUrl,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${placidApiKey}`
+                    }
+                }
+            );
+
+            // Actualiza el estado actual y la URL de la imagen con la respuesta del polling.
+            currentStatus = pollingResponse.data.status;
+            imageUrl = pollingResponse.data.image_url;
+
+            console.log(`Estado actual: ${currentStatus}, Image URL: ${imageUrl}`);
+
+            // Si el estado es 'failed', significa que la generación de la imagen falló.
+            if (currentStatus === 'failed') {
+                console.error("Placid.app falló al generar la imagen:", pollingResponse.data.errors);
+                return res.status(500).json({
+                    'status': '0',
+                    'msg': 'Placid.app falló al generar la imagen.',
+                    'errors': pollingResponse.data.errors
+                });
+            }
+        }
+
+        // Después del bucle de polling, si se obtuvo una URL de imagen.
+        if (imageUrl) {
+            console.log("Imagen Placid generada con éxito:", imageUrl);
+
+            // Actualiza el campo 'imagen' de la reserva en la base de datos con la URL de la imagen generada.
+            await Reserva.findByIdAndUpdate(
+                reservaId,
+                { imagen: imageUrl },
+                { new: true } // Devuelve el documento actualizado.
+            );
+
+            // Devuelve una respuesta de éxito con la URL de la imagen.
+            return res.status(200).json({
+                'status': '1',
+                'msg': 'Ticket Placid generado y URL obtenida.',
+                'image_url': imageUrl,
+                'reserva_id': reservaId
+            });
+        } else {
+            // Si después de todos los intentos no se obtuvo una URL de imagen.
+            console.error("No se pudo obtener la URL de la imagen después de múltiples intentos.");
+            return res.status(500).json({
+                'status': '0',
+                'msg': 'No se pudo generar la imagen del ticket en el tiempo esperado.'
+            });
+        }
+
+    } catch (error) {
+        console.error("Error en backend al generar ticket Placid (general):", error.response ? error.response.data : error.message);
+        return res.status(error.response && error.response.status ? error.response.status : 500).json({
+            'status': '0',
+            'msg': 'Error al procesar la solicitud para generar el ticket Placid.',
+            'error': error.response ? error.response.data : error.message
+        });
+    }
+};
 
 module.exports = reservaCtrl;
