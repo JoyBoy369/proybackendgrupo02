@@ -2,6 +2,14 @@ const Reserva = require('../models/reserva');
 const Funcion = require('../models/funcion');
 const reservaCtrl = {};
 
+// Colores estáticos para los reportes
+const COLORS = {
+    PELICULAS: '#4CAF50',
+    VENTAS: '#2196F3',
+    FUNCIONES: '#FF9800',
+    RESERVAS: '#9C27B0'
+};
+
 reservaCtrl.getReservas = async (req, res) => {
     try {
         const reservas = await Reserva.find().populate('funcion');
@@ -157,64 +165,64 @@ reservaCtrl.getResumenSemanal = async (req, res) => {
     try {
         const hoy = new Date();
         // Establece la hora al final del día de hoy para incluir todas las reservas de hoy
-        hoy.setHours(23, 59, 59, 999); 
-    
+        hoy.setHours(23, 59, 59, 999);
+
         // Calcula la fecha de hace 7 días, comenzando al inicio de ese día
         const hace7Dias = new Date(hoy);
         hace7Dias.setDate(hoy.getDate() - 6); // Restamos 6 para incluir el día actual y los 6 anteriores
         hace7Dias.setHours(0, 0, 0, 0); // Establece la hora al inicio del día
-    
+
         const ventasPorDia = await Reserva.aggregate([
-          {
-            $match: {
-              // Aseguramos que la fecha de la reserva esté en el rango inclusivo
-              fecha: { $gte: hace7Dias, $lte: hoy } 
+            {
+                $match: {
+                    // Aseguramos que la fecha de la reserva esté en el rango inclusivo
+                    fecha: { $gte: hace7Dias, $lte: hoy }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        $dateToString: { format: "%Y-%m-%d", date: "$fecha" } // Agrupa por fecha (formato YYYY-MM-DD)
+                    },
+                    totalBoletosVendidos: { $sum: "$cantidadReservas" } // Suma la cantidad de reservas por día
+                }
+            },
+            {
+                $sort: { _id: 1 } // Ordena por fecha ascendente
             }
-          },
-          {
-            $group: {
-              _id: {
-                $dateToString: { format: "%Y-%m-%d", date: "$fecha" } // Agrupa por fecha (formato YYYY-MM-DD)
-              },
-              totalBoletosVendidos: { $sum: "$cantidadReservas" } // Suma la cantidad de reservas por día
-            }
-          },
-          {
-            $sort: { _id: 1 } // Ordena por fecha ascendente
-          }
         ]);
-    
+
         // Preparar los datos para Chart.js
         const labels = [];
         const data = [];
         const backgroundColors = ['rgba(54, 162, 235, 0.6)', 'rgba(255, 99, 132, 0.6)', 'rgba(75, 192, 192, 0.6)', 'rgba(153, 102, 255, 0.6)', 'rgba(255, 159, 64, 0.6)', 'rgba(255, 99, 132, 0.6)', 'rgba(75, 192, 192, 0.6)'];
-        
+
         // Mapear las ventas obtenidas para facilitar la búsqueda
         const ventasMap = new Map(ventasPorDia.map(item => [item._id, item.totalBoletosVendidos]));
-    
+
         // Llenar los datos para los últimos 7 días
         for (let i = 0; i < 7; i++) {
-          const fechaIteracion = new Date(hace7Dias);
-          fechaIteracion.setDate(hace7Dias.getDate() + i);
-          const fechaFormateada = fechaIteracion.toISOString().split('T')[0]; // Formato YYYY-MM-DD
-    
-          const boletosVendidos = ventasMap.get(fechaFormateada) || 0; // Obtiene el total o 0 si no hay ventas
-          
-          labels.push(fechaFormateada);
-          data.push(boletosVendidos); 
+            const fechaIteracion = new Date(hace7Dias);
+            fechaIteracion.setDate(hace7Dias.getDate() + i);
+            const fechaFormateada = fechaIteracion.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+
+            const boletosVendidos = ventasMap.get(fechaFormateada) || 0; // Obtiene el total o 0 si no hay ventas
+
+            labels.push(fechaFormateada);
+            data.push(boletosVendidos);
         }
-    
+
         res.status(200).json({
-          labels: labels,
-          data: data,
-          backgroundColor: backgroundColors
+            labels: labels,
+            data: data,
+            backgroundColor: backgroundColors
         });
-    
-      } catch (error) {
+
+    } catch (error) {
         console.error("Error al obtener las ventas de los últimos 7 días:", error);
         res.status(500).json({ message: "Error interno del servidor." });
-      }
-    
+    }
+
 };
 
 reservaCtrl.getIngresosSemanales = async (req, res) => {
@@ -322,11 +330,11 @@ reservaCtrl.getIngresosAnuales = async (req, res) => {
         const labels = [];
         const data = [];
         const meses = [
-            'Enero', 'Febrero', 'Marzo', 'Abril', 
+            'Enero', 'Febrero', 'Marzo', 'Abril',
             'Mayo', 'Junio', 'Julio', 'Agosto',
             'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
         ];
-        
+
         for (let mes = 1; mes <= 12; mes++) {
             labels.push(meses[mes - 1]);
             const ingresoMes = ingresos.find(d => d._id.mes === mes);
@@ -337,7 +345,7 @@ reservaCtrl.getIngresosAnuales = async (req, res) => {
         const backgroundColors = [
             'rgba(255, 99, 132, 0.6)'
         ];
-        
+
 
         res.status(200).json({
             labels: labels,
@@ -423,16 +431,16 @@ reservaCtrl.getVentasPorPelicula = async (req, res) => {
             const peliculaId = reserva.funcion.pelicula._id.toString();
             const cantidad = reserva.cantidadReservas;
             const pelicula = reserva.funcion.pelicula;
-            
+
             if (!acc[peliculaId]) {
-                acc[peliculaId] = { 
+                acc[peliculaId] = {
                     peliculaId: peliculaId,
                     pelicula: pelicula.originalTitle,
                     totalVentas: 0
                 };
             }
             acc[peliculaId].totalVentas += cantidad;
-            
+
             return acc;
         }, {});
 
@@ -481,10 +489,10 @@ reservaCtrl.getAsistenciaPorFuncion = async (req, res) => {
             const funcionId = reserva.funcion._id.toString();
             const cantidad = reserva.cantidadReservas;
             const funcion = reserva.funcion;
-            
+
             if (!acc[funcionId]) {
-                acc[funcionId] = { 
-                    funcion: funcionId, 
+                acc[funcionId] = {
+                    funcion: funcionId,
                     totalAsistencia: 0,
                     detalles: {
                         pelicula: funcion.pelicula.originalTitle,
@@ -495,7 +503,7 @@ reservaCtrl.getAsistenciaPorFuncion = async (req, res) => {
                 };
             }
             acc[funcionId].totalAsistencia += cantidad;
-            
+
             return acc;
         }, {});
 
@@ -574,5 +582,240 @@ reservaCtrl.getReservasByUser = async (req, res) => {
     }
 };
 
+reservaCtrl.getReporteVentas = async (req, res) => {
+    try {
+        // Get the date 7 days ago
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        // Get all reservations from the last 7 days
+        const reservas = await Reserva.find({
+            fecha: { $gte: sevenDaysAgo }
+        }).populate('funcion');
+
+        // Initialize arrays and counters
+        const days = [];
+        const data = new Array(7).fill(0);
+        const colors = [];
+        let totalVentas = 0;
+        let totalReservas = 0;
+        let totalButacasOcupadas = 0;
+        let totalButacasTotales = 0;
+
+        // Calculate daily sales and totals
+        reservas.forEach(reserva => {
+            const dayIndex = Math.floor((new Date(reserva.fecha) - sevenDaysAgo) / (1000 * 60 * 60 * 24));
+            if (dayIndex >= 0 && dayIndex < 7) {
+                data[dayIndex] += reserva.precioFinal;
+                totalVentas += reserva.precioFinal;
+                totalReservas += reserva.cantidadReservas;
+            }
+        });
+
+        // Get all active functions from the last 7 days
+        const funciones = await Funcion.find({
+            estado: 'activa',
+            fecha: { $gte: sevenDaysAgo }
+        });
+
+        // Calculate occupancy
+        funciones.forEach(funcion => {
+            totalButacasOcupadas += funcion.butacasOcupadas.length;
+            totalButacasTotales += funcion.numeroButacas;
+        });
+
+        // Generate labels (day names) and colors
+        for (let i = 0; i < 7; i++) {
+            const date = new Date(sevenDaysAgo);
+            date.setDate(sevenDaysAgo.getDate() + i);
+            days.push(date.toLocaleDateString('es-ES', { weekday: 'long' }));
+            colors.push(COLORS.VENTAS);
+        }
+
+        // Calculate averages
+        const promedioDiario = totalReservas / 7;
+        const ocupacion = totalButacasTotales > 0 ? (totalButacasOcupadas / totalButacasTotales) * 100 : 0;
+
+        return res.status(200).json({
+            data: data,
+            labels: days,
+            backgroundColor: colors,
+            totalVentas: totalVentas,
+            promedioDiario: promedioDiario,
+            ocupacion: ocupacion
+        });
+
+    } catch (error) {
+        console.error("Error al obtener el reporte de ventas:", error);
+        return res.status(500).json({
+            'status': '0',
+            'msg': 'Error al procesar la operación de reporte de ventas.',
+            'error': error.message
+        });
+    }
+}
+
+reservaCtrl.getReportePelículas = async (req, res) => {
+    try {
+        // Get all reservations with their associated functions
+        const reservas = await Reserva.find()
+            .populate('funcion');
+
+        // Get all unique movie IDs from functions
+        const movieIds = [...new Set(reservas.map(r => r.funcion.pelicula).filter(id => id))];
+
+        // Get movie titles
+        const peliculas = await Pelicula.find({ _id: { $in: movieIds } });
+        const peliculasMap = new Map(peliculas.map(p => [p._id.toString(), p.originalTitle]));
+
+        // Initialize arrays
+        const movieData = {};
+
+        // Calculate total reservations per movie
+        reservas.forEach(reserva => {
+            const movieId = reserva.funcion.pelicula;
+            if (movieId) {
+                if (!movieData[movieId]) {
+                    movieData[movieId] = {
+                        nombre: peliculasMap.get(movieId.toString()) || 'Desconocido',
+                        totalReservas: 0
+                    };
+                }
+                movieData[movieId].totalReservas += reserva.cantidadReservas;
+            }
+        });
+
+        // Convert to array and sort by totalReservas (descending)
+        const sortedMovies = Object.values(movieData).sort((a, b) => b.totalReservas - a.totalReservas);
+
+        // Generate data arrays
+        const data = sortedMovies.map(movie => movie.totalReservas);
+        const labels = sortedMovies.map(movie => movie.nombre);
+        const backgroundColor = [];
+
+        // Generate colors based on number of movies
+        const colorCount = sortedMovies.length;
+        for (let i = 0; i < colorCount; i++) {
+            backgroundColor.push('#${Math.floor(Math.random()*16777215).toString(16)}');
+        }
+
+        return res.status(200).json({
+            data: data,
+            labels: labels,
+            backgroundColor: backgroundColor,
+            topPeliculas: sortedMovies
+        });
+
+    } catch (error) {
+        console.error("Error al obtener el reporte de películas:", error);
+        return res.status(500).json({
+            'status': '0',
+            'msg': 'Error al procesar la operación de reporte de películas.',
+            'error': error.message
+        });
+    }
+}
+
+reservaCtrl.getReporteFunciones = async (req, res) => {
+    try {
+        // Obtener todas las reservas con sus funciones
+        const reservas = await Reserva.find()
+            .populate('funcion');
+
+        // Obtener todos los IDs únicos de funciones
+        const funcionIds = [...new Set(reservas.map(r => r.funcion._id).filter(id => id))];
+
+        // Obtener las funciones y sus películas
+        const funciones = await Funcion.find({ _id: { $in: funcionIds } })
+            .populate('pelicula', 'originalTitle');
+
+        // Crear un Map de funciones para fácil acceso
+        const funcionesMap = new Map(funciones.map(f => [f._id.toString(), {
+            nombre: f.pelicula ? f.pelicula.originalTitle : 'Desconocido',
+            hora: f.hora
+        }]));
+
+        // Inicializar arrays
+        const funcionData = {};
+
+        // Calcular total de reservas por función
+        reservas.forEach(reserva => {
+            const funcionId = reserva.funcion._id;
+            if (funcionId) {
+                if (!funcionData[funcionId]) {
+                    const funcionInfo = funcionesMap.get(funcionId.toString());
+                    funcionData[funcionId] = {
+                        nombre: '${funcionInfo.nombre} - ${funcionInfo.hora}',
+                        totalReservas: 0
+                    };
+                }
+                funcionData[funcionId].totalReservas += reserva.cantidadReservas;
+            }
+        });
+
+        // Convertir a array y ordenar por total de reservas
+        const sortedFunciones = Object.values(funcionData).sort((a, b) => b.totalReservas - a.totalReservas);
+
+        // Generar arrays de respuesta
+        const data = sortedFunciones.map(f => f.totalReservas);
+        const labels = sortedFunciones.map(f => f.nombre);
+
+        return res.status(200).json({
+            data: data,
+            labels: labels,
+            backgroundColor: COLORS.FUNCIONES,
+            funciones: sortedFunciones
+        });
+
+    } catch (error) {
+        console.error("Error al obtener el reporte de funciones:", error);
+        return res.status(500).json({
+            'status': '0',
+            'msg': 'Error al procesar la operación de reporte de funciones.',
+            'error': error.message
+        });
+    }
+}
+
+reservaCtrl.getReporteReservas = async (req, res) => {
+    try {
+        // Obtener todas las reservas
+        const reservas = await Reserva.find();
+
+        // Inicializar arrays
+        const dailyReservas = {};
+
+        // Calcular total de reservas por día
+        reservas.forEach(reserva => {
+            const date = new Date(reserva.fecha);
+            const day = date.toLocaleDateString('es-ES');
+            if (!dailyReservas[day]) {
+                dailyReservas[day] = 0;
+            }
+            dailyReservas[day] += reserva.cantidadReservas;
+        });
+
+        // Convertir a arrays ordenados
+        const sortedDays = Object.entries(dailyReservas)
+            .sort((a, b) => new Date(a[0]) - new Date(b[0]));
+
+        const data = sortedDays.map(([day, count]) => count);
+        const labels = sortedDays.map(([day]) => day);
+
+        return res.status(200).json({
+            data: data,
+            labels: labels,
+            backgroundColor: COLORS.RESERVAS
+        });
+
+    } catch (error) {
+        console.error("Error al obtener el reporte de reservas:", error);
+        return res.status(500).json({
+            'status': '0',
+            'msg': 'Error al procesar la operación de reporte de reservas.',
+            'error': error.message
+        });
+    }
+}
 
 module.exports = reservaCtrl;
