@@ -1,16 +1,28 @@
 const Usuario = require('../models/usuario');
 const usuarioCtrl = {}
 const { verifyGoogleToken } = require('../security/googleAuth');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 
 usuarioCtrl.createUsuario = async (req, res) => {
-    const existente = await Usuario.findOne({ email: req.body.email });
-    if (existente) {
+    const existeEmail = await Usuario.findOne({ email: req.body.email });
+    const existeUsername = await Usuario.findOne({ username: req.body.username });
+    if (existeEmail) {
         return res.status(409).json({
             status: '0',
             msg: 'Ya existe un usuario con ese email.'
         })
     }
-    var usuario = new Usuario(req.body);
+    if (existeUsername) {
+        return res.status(409).json({
+            status: '0',
+            msg: 'Ya existe un usuario con ese username.'
+        })
+    }
+    const usuario = new Usuario(req.body);
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(usuario.password, salt);
+    usuario.password = hashedPassword;
     try {
         await usuario.save();
         res.json({
@@ -26,17 +38,27 @@ usuarioCtrl.createUsuario = async (req, res) => {
 }
 
 usuarioCtrl.registerUsuario = async (req, res) => {
-    const existente = await Usuario.findOne({ email: req.body.email });
-    if (existente) {
+    const existeEmail = await Usuario.findOne({ email: req.body.email });
+    const existeUsername = await Usuario.findOne({ username: req.body.username });
+    if (existeEmail) {
         return res.status(409).json({
             status: '0',
             msg: 'Ya existe un usuario con ese email.'
+        })
+    }
+    if (existeUsername) {
+        return res.status(409).json({
+            status: '0',
+            msg: 'Ya existe un usuario con ese username.'
         })
     }
     const usuario = new Usuario({
         ...req.body,
         rol: 'Cliente'
     })
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(usuario.password, salt);
+    usuario.password = hashedPassword;
     try {
         await usuario.save();
         res.json({
@@ -61,13 +83,15 @@ usuarioCtrl.getUsuariosByRol = async (req, res) => {
     res.json(usuarios);
 }
 
-usuarioCtrl.getUsuariosByEmail = async (req, res) => {
-    var usuarios = await Usuario.find({ email: req.params.email });
-    res.json(usuarios);
-}
+usuarioCtrl.getUsuarioByEmail = async (req, res) => {
+    const usuario = await Usuario.findOne({ email: req.params.email });
+    if (!usuario) return res.status(404).json({ status: 0, msg: 'No encontrado' });
+    res.json(usuario);
+};
 
 usuarioCtrl.getUsuario = async (req, res) => {
     const usuario = await Usuario.findById(req.params.id);
+    if (!usuario) return res.status(404).json({ status: 0, msg: 'No encontrado' });
     res.json(usuario);
 }
 
@@ -80,18 +104,23 @@ usuarioCtrl.loginUsuario = async (req, res) => {
             $or: [
                 { email: login },
                 { username: login }
-            ],
-            password: password  // asegúrate que el campo en la DB sea password y no contrasenia
+            ]
         });
-
         if (!user) {
             return res.status(401).json({
                 status: 0,
-                msg: "Email/username o contraseña incorrectos."
+                msg: "Email/username incorrectos."
             });
         }
-
+        const validPass = await bcrypt.compare(password, user.password);
+        if(!validPass){
+            return res.status(401).json({
+                status: 0,
+                msg: "Password incorrecto."
+            });
+        }
         // Login exitoso
+        const unToken = jwt.sign({id: user._id}, "secretkey", {expiresIn: '2h'});
         res.json({
             status: 1,
             msg: "Login exitoso.",
@@ -100,7 +129,8 @@ usuarioCtrl.loginUsuario = async (req, res) => {
             nombre: user.nombre,
             email: user.email,
             estado: user.estado,
-            rol: user.rol
+            rol: user.rol,
+            token: unToken
         });
 
     } catch (error) {
