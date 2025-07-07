@@ -16,6 +16,8 @@ app.use('/api/pelicula', require('./routes/pelicula.route.js'));
 app.use('/api/funcion', require('./routes/funcion.route.js'));
 app.use('/api/reserva', require('./routes/reserva.route.js'));
 app.set('port', process.env.PORT || 3000);
+//Mercado Pago
+app.use('/api/mp', require('./routes/mp.routes.js'));
 
 // Tarea programada para archivar funciones pasadas
 // Se ejecutará cada día a la medianoche (00:00 AM) hora del servidor donde se ejecute este proceso.
