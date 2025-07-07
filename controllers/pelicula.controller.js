@@ -1,5 +1,6 @@
 const Pelicula = require('../models/pelicula');
 const peliculaCtrl = {}
+const { notificarNuevaPelicula } = require('../models/telegramBot');
 
 //  Obtiene todas las películas de la base de datos.
 peliculaCtrl.getPeliculas = async (req, res) => {
@@ -37,33 +38,41 @@ peliculaCtrl.getPelicula = async (req, res) => {
 
 // Crea una nueva película en la base de datos
 peliculaCtrl.createPelicula = async (req, res) => {
-    var pelicula = new Pelicula(req.body);
+    const pelicula = new Pelicula(req.body);
+
     try {
-        // Antes de guardar, busca si ya existe una película con el mismo 'originalTitle'.
+        // Verifica si ya existe una película con el mismo 'originalTitle'
         const existingMovie = await Pelicula.findOne({ originalTitle: pelicula.originalTitle });
 
-        // Si ya existe una película con ese título.
         if (existingMovie) {
             return res.status(409).json({
-                'status': '0',
-                'msg': 'Error: La película ya existe en la base de datos'
+                status: '0',
+                msg: 'Error: La película ya existe en la base de datos'
             });
         }
 
-        // Si la película no existe, intenta guardarla en la base de datos.
+        // Guarda la nueva película
         await pelicula.save();
+
+        // Notifica a Telegram
+        try {
+            await notificarNuevaPelicula(pelicula);
+        } catch (notifError) {
+            console.error("Error al notificar por Telegram:", notifError.message);
+        }
+
         res.status(201).json({
-            'status': '1',
-            'msg': 'Película guardada con éxito'
+            status: '1',
+            msg: 'Película guardada con éxito'
         });
     } catch (error) {
         console.error("Error al crear película:", error);
         res.status(400).json({
-            'status': '0',
-            'msg': 'Error procesando la operación. Verifique los datos enviados.'
+            status: '0',
+            msg: 'Error procesando la operación. Verifique los datos enviados.'
         });
     }
-}
+};
 
 //Actualiza una película existente en la base de datos.
 peliculaCtrl.updatePelicula = async (req, res) => {
