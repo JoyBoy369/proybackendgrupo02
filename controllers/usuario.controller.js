@@ -54,7 +54,7 @@ usuarioCtrl.registerUsuario = async (req, res) => {
     }
     const usuario = new Usuario({
         ...req.body,
-        rol: 'Cliente'
+        rol: 'cliente'
     })
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(usuario.password, salt);
