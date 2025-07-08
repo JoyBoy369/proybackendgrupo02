@@ -196,7 +196,8 @@ usuarioCtrl.googleLoginUsuario = async (req, res) => {
     const payload = await verifyGoogleToken(idToken);
     console.log('Payload del token verificado:', payload);
     // Aquí continua la lógica de login o registro con el payload
-    res.json({ status: '1', msg: 'Login Google OK', user: payload });
+    const unToken = jwt.sign({id: payload._id}, "secretkey", {expiresIn: '2h'});
+    res.json({ status: '1', msg: 'Login Google OK', user: payload, tokenGugul: unToken });
   } catch (error) {
     console.error('Error verificando token Google:', error);
     return res.status(400).json({ message: 'Token verification failed', error });
