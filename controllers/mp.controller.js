@@ -1,7 +1,7 @@
 // Importa la librería 'axios' para realizar solicitudes HTTP a APIs externas.
 const axios = require("axios");
 const Reserva = require('../models/reserva');
-const url=   "https://proyfrontendgrupo02.onrender.com";
+const urlRender=   "https://proyfrontendgrupo02.onrender.com";
 
 
 const mpCtrl = {};
@@ -36,9 +36,9 @@ mpCtrl.getPaymentLink = async (req, res) => {
             ],
             back_urls: { // URLs a las que Mercado Pago redirigirá al usuario después del proceso de pago. 
                         //(Cambiarlo los links cuando se suba el sitio a producción )
-                failure: `${url}/pago/fallido`,   // URL para pago fallido.
-                pending: `${url}/pago/pendiente`, // URL para pago pendiente.
-                success: `${url}/pago/exitoso`   // URL para pago exitoso.
+                failure: `${urlRender}/pago/fallido`,   // URL para pago fallido.
+                pending: `${urlRender}/pago/pendiente`, // URL para pago pendiente.
+                success: `${urlRender}/pago/exitoso`   // URL para pago exitoso.
             },
             external_reference: reservationId, // **Referencia externa crucial:** Aquí se envía el ID de reserva.
                                               // Esto permite vincular la notificación de pago de MP con tu reserva interna.
