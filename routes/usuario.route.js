@@ -23,5 +23,6 @@ router.put('/:id',authCtrl.verifyToken, usuarioCtrl.editUsuario);
 router.delete('/:id',authCtrl.verifyToken, usuarioCtrl.deleteUsuario);
 router.post('/validator', usuarioCtrl.validarNuevoUsuario);
 router.post('/google-login', usuarioCtrl.googleLoginUsuario);
+router.get('/buscar/:email', usuarioCtrl.getUsuarioByEmail);
 
 module.exports = router;
