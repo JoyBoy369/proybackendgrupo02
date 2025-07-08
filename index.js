@@ -9,7 +9,7 @@ dotenv.config();
 var app = express();
 
 app.use(express.json());
-app.use(cors({ origin: 'http://localhost:4200' }));
+app.use(cors({ origin: 'https://proyfrontendgrupo02.onrender.com' }));
 
 app.use('/api/usuario', require('./routes/usuario.route.js'));
 app.use('/api/pelicula', require('./routes/pelicula.route.js'));
