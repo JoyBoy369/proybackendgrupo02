@@ -15,7 +15,7 @@ app.use('/api/usuario', require('./routes/usuario.route.js'));
 app.use('/api/pelicula', require('./routes/pelicula.route.js'));
 app.use('/api/funcion', require('./routes/funcion.route.js'));
 app.use('/api/reserva', require('./routes/reserva.route.js'));
-app.use('/api/reporte', require('./routers/reporte.route.js'));
+app.use('/api/reporte', require('./routes/reporte.route.js'));
 app.set('port', process.env.PORT || 3000);
 //Mercado Pago
 app.use('/api/mp', require('./routes/mp.routes.js'));
