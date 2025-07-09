@@ -23,6 +23,10 @@ const swaggerOptions = {
         },
         servers: [
             {
+                url: 'https://proybackendgrupo02.onrender.com',
+                description: 'Servidor de producción',
+            },
+            {
                 url: `http://localhost:${process.env.PORT || 3000}`,
                 description: 'Servidor de desarrollo',
             },
