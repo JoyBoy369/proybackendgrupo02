@@ -1,12 +1,50 @@
+// Configurar dotenv ANTES de importar otros módulos que puedan usar variables de entorno
+const dotenv = require("dotenv");
+dotenv.config();
+
 const express = require('express');
 const cors = require('cors');
 const { mongoose } = require('./database');
 const cron = require('node-cron');
 const funcionCtrl = require('./controllers/funcion.controller');
-const dotenv = require("dotenv");
-dotenv.config();
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
 
 var app = express();
+
+// Configuración de Swagger
+const swaggerOptions = {
+    definition: {
+        openapi: '3.0.0',
+        info: {
+            title: 'API Sistema de Cine',
+            version: '1.0.0',
+            description: 'API para el sistema de gestión de cine con reservas, películas, funciones y usuarios',
+        },
+        servers: [
+            {
+                url: `http://localhost:${process.env.PORT || 3000}`,
+                description: 'Servidor de desarrollo',
+            },
+        ],
+        components: {
+            securitySchemes: {
+                bearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT',
+                }
+            }
+        },
+        security: [{
+            bearerAuth: []
+        }]
+    },
+    apis: ['./routes/*.js', './swagger/*.js'], // archivos que contienen anotaciones de Swagger
+};
+
+const specs = swaggerJsdoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
 app.use(express.json());
 app.use(cors({ origin: 'https://proyfrontendgrupo02.onrender.com' }));
@@ -16,6 +54,7 @@ app.use('/api/pelicula', require('./routes/pelicula.route.js'));
 app.use('/api/funcion', require('./routes/funcion.route.js'));
 app.use('/api/reserva', require('./routes/reserva.route.js'));
 app.use('/api/reporte', require('./routes/reporte.route.js'));
+
 app.set('port', process.env.PORT || 3000);
 //Mercado Pago
 app.use('/api/mp', require('./routes/mp.routes.js'));
